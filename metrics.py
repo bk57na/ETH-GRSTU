@@ -2,7 +2,7 @@ import numpy as np
 
 def metrics(returns, regime, hedged=1):
     # hedge type
-    regime = np.where(regime == 0, 1 - hedged, 1)
+    regime = np.where(regime == 0, 1, 1 - hedged)
 
     # R-S strategy
     strategy1 = regime
@@ -25,9 +25,6 @@ def metrics(returns, regime, hedged=1):
     print(
         f"Value at Risk (VaR) at {confidence_level * 100}% confidence level, for a strategy hedged at {hedged:.1%} is {var1:.2%}")
 
-    var2 = np.percentile(rets2, (1 - confidence_level) * 100)
-    print(f"Value at Risk (VaR) at {confidence_level * 100}% confidence level, for a holding strategy is {var2:.2%}")
-
     # cvar strategy 1 and 2
     var_threshold1 = np.percentile(rets1, (1 - confidence_level) * 100)
     tail_losses1 = rets1[rets1 < var_threshold1]
@@ -35,15 +32,57 @@ def metrics(returns, regime, hedged=1):
     print(
         f"Conditional Value at Risk (CVaR) at {confidence_level * 100}% confidence level, for a strategy hedged at {hedged:.1%} is {cvar1:.2%}")
 
-    var_threshold2 = np.percentile(rets2, (1 - confidence_level) * 100)
-    tail_losses2 = rets2[rets2 < var_threshold2]
-    cvar2 = tail_losses2.mean()
-    print(
-        f"Conditional Value at Risk (CVaR) at {confidence_level * 100}% confidence level, for a holding strategy is {cvar2:.2%}")
+    #log returns
+    days_per_year = 252
+    years = 20
 
-    # cumulative return
-    cumulative_return1 = np.prod([1 + r for r in rets1]) - 1
-    print(f"Cumulative return for a strategy hedged at {hedged:.1%}: {cumulative_return1:.2%}")
+    annual_log_returns = []
 
-    cumulative_return2 = np.prod([1 + r for r in rets2]) - 1
-    print(f"Cumulative return for a holding strategy: {cumulative_return2:.2%}")
+    for year in range(years):
+        # Extract returns for one year
+        start = year * days_per_year
+        end = start + days_per_year
+        yearly_returns = rets1[start:end]
+
+        # Calculate log returns for the year
+        log_returns = np.log(1 + yearly_returns)
+
+        # Sum log returns to get annual log return
+        annual_log_return = np.sum(log_returns)
+
+        annual_log_returns.append(annual_log_return)
+
+    annual_log_returns = np.mean(annual_log_returns)
+    print(f"Annual log returns for each year: {annual_log_returns:.2%}")
+
+    #Volatility
+    volatility1 = np.std(rets1, ddof=1)
+    volatility1 = volatility1 * np.sqrt(252)
+    print(f"Volatility for a strategy hedged at {hedged:.1%}: {volatility1:.2%}")
+
+    # Risk-free rate (annualized, e.g., 2% = 0.02)
+    risk_free_rate_annual = 0.05
+
+
+    # Excess returns
+    excess_returns = rets1 - risk_free_rate_annual
+
+    # Sharpe ratio (daily)
+    mean_excess_return = np.mean(excess_returns)
+    sharpe1 = mean_excess_return / volatility1
+    print(f"Sharpe Ratio for a strategy hedged at {hedged:.1%}: {-1 * sharpe1:.3f}")
+
+    # Step 1: Convert returns to cumulative price/index (start at 1)
+    cumulative = np.cumprod(1 + rets1)
+
+    # Step 2: Calculate running maximum of cumulative
+    running_max = np.maximum.accumulate(cumulative)
+
+    # Step 3: Calculate drawdowns
+    drawdowns = (running_max - cumulative) / running_max
+
+    # Step 4: Get the maximum drawdown (worst case)
+    max_drawdown = np.max(drawdowns)
+
+    print(f"Maximum Worst-Case Drawdown being hedge at {hedged:.1%}: {max_drawdown:.2%}")
+
